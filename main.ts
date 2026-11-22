@@ -29,10 +29,25 @@ try {
 }
 
 // The gate refuses a POST.json that does not read as JSON naming an X post,
-// so confirm the copy parses and carries a url before the run ends.
+// so confirm the copy parses and carries a url before the run ends. A bare
+// x.com link is not enough: require the real shape of a post address,
+// https://x.com/<handle>/status/<digits>, so a profile or search link
+// cannot slip through as the entry.
 const posted = JSON.parse(readFileSync(target, 'utf8')) as { url?: unknown };
-if (typeof posted.url !== 'string' || !posted.url.startsWith('https://x.com/')) {
-  console.error('POST.json does not name an X post URL.');
+let postUrl: URL | null = null;
+try {
+  postUrl = typeof posted.url === 'string' ? new URL(posted.url) : null;
+} catch {
+  postUrl = null;
+}
+if (
+  postUrl === null ||
+  postUrl.hostname !== 'x.com' ||
+  !/^\/[^/]+\/status\/\d+$/.test(postUrl.pathname)
+) {
+  console.error(
+    'POST.json does not name an X post URL (expected https://x.com/<handle>/status/<id>).',
+  );
   process.exit(1);
 }
-console.log(`Entry post: ${posted.url}`);
+console.log(`Entry post: ${postUrl.href}`);
